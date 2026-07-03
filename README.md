@@ -20,6 +20,9 @@ viewer roles alone, so it can be handed to anyone on the team without change-ris
 It may grow administrative verbs (e.g. triggering connector syncs, managing
 agents) in a future release.
 
+Contributing with an AI coding agent? Read [AGENTS.md](AGENTS.md) — it maps
+the project subagents, skills and hard constraints.
+
 ## Install
 
 ```sh
