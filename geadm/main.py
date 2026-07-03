@@ -85,6 +85,13 @@ def run() -> None:
         message=".*end user credentials.*without a quota project.*",
         category=UserWarning,
     )
+    # The API can return enum values newer than the published client knows
+    # (e.g. preview ContentConfig values); geadm renders them numerically.
+    warnings.filterwarnings(
+        "ignore",
+        message=r"Unrecognized \w+ enum value.*",
+        category=UserWarning,
+    )
 
     try:
         app()
