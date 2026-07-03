@@ -450,7 +450,7 @@ def quota_command(
     ),
     as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Show quota usage against limits."""
+    """Show quota usage."""
     from geadm.auth import get_clients
 
     state = ctx.obj
@@ -495,7 +495,7 @@ def stats_command(
     ),
     as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Show query volume, latency and connector sync freshness."""
+    """Show usage metrics."""
     from geadm.auth import get_clients
 
     state = ctx.obj
