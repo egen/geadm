@@ -12,8 +12,9 @@ assumes a specific metric type is present.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import typer
 from google.api import metric_pb2
@@ -103,6 +104,7 @@ def collect_stats(
     since: str,
     engine: str | None = None,
     categories: set[str] | None = None,
+    progress: Callable[[str, int, int], None] | None = None,
 ) -> dict:
     """Discover discoveryengine metrics and summarise volume/latency/connector sync.
 
@@ -141,13 +143,11 @@ def collect_stats(
     if not descriptors:
         return result
 
-    connector_latest: Optional[str] = None
     alignment_seconds = 300
 
-    for descriptor in descriptors:
+    def summarize(descriptor: Any) -> tuple[str, dict]:
+        """Query and summarise one metric (runs on a worker thread)."""
         category = _category_for(descriptor.type, descriptor.value_type)
-        if categories is not None and category not in categories:
-            continue
         aggregation, aggregate_label = _aggregation_for(
             descriptor.metric_kind, descriptor.value_type, category, alignment_seconds
         )
@@ -194,7 +194,7 @@ def collect_stats(
         else:
             aggregate = None
 
-        summary = {
+        return category, {
             "type": descriptor.type,
             "category": category,
             "metric_kind": MetricDescriptor.MetricKind.Name(descriptor.metric_kind),
@@ -206,14 +206,28 @@ def collect_stats(
             "engine_filter_applied": engine_applied,
         }
 
-        if category == "connector":
-            result["connector"]["metrics"][descriptor.type] = summary
-            if latest_iso and (connector_latest is None or latest_iso > connector_latest):
-                connector_latest = latest_iso
-        elif category == "latency":
-            result["latency"][descriptor.type] = summary
-        else:
-            result["query_volume"][descriptor.type] = summary
+    wanted = [
+        d
+        for d in descriptors
+        if categories is None or _category_for(d.type, d.value_type) in categories
+    ]
+
+    done = 0
+    connector_latest: Optional[str] = None
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        for category, summary in pool.map(summarize, wanted):
+            done += 1
+            if progress:
+                progress(summary["type"], done, len(wanted))
+            latest_iso = summary["latest_point_time"]
+            if category == "connector":
+                result["connector"]["metrics"][summary["type"]] = summary
+                if latest_iso and (connector_latest is None or latest_iso > connector_latest):
+                    connector_latest = latest_iso
+            elif category == "latency":
+                result["latency"][summary["type"]] = summary
+            else:
+                result["query_volume"][summary["type"]] = summary
 
     result["connector"]["freshest_point"] = connector_latest
 
@@ -297,7 +311,20 @@ def stats_command(
     clients = get_clients(state.project, state.location, getattr(state, "quota_project", None))
 
     try:
-        data = collect_stats(clients, since=since, engine=engine)
+        # Single-line spinner on stderr while the (parallelised) metric walk
+        # runs; stdout stays clean for tables/--json.
+        if err_console.is_terminal:
+            with err_console.status("Discovering metrics…", spinner="dots") as status:
+
+                def show_progress(metric_type: str, done: int, total: int) -> None:
+                    short = metric_type.removeprefix("discoveryengine.googleapis.com/")
+                    status.update(f"[{done}/{total}] {short}")
+
+                data = collect_stats(
+                    clients, since=since, engine=engine, progress=show_progress
+                )
+        else:
+            data = collect_stats(clients, since=since, engine=engine)
     except ValueError as exc:
         err_console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1)
