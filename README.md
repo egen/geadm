@@ -148,6 +148,21 @@ that tripped and their confidence (jailbreak, RAI categories, CSAM,
 malicious URIs). Violations only by default; `--all` includes clean
 screenings. Carries no user identity — pair with `geadm logs user`.
 
+Add `--policy` to print the configured Model Armor template(s) instead — the
+filters that are enabled and at what confidence:
+
+```console
+$ geadm armor --policy
+            Model Armor policy — ge-default-amer (us)
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┓
+┃ Filter                            ┃ Enforcement ┃ Confidence       ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━┩
+│ Prompt injection & jailbreak      │ ENABLED     │ HIGH             │
+│ Responsible AI: DANGEROUS         │ ENABLED     │ MEDIUM_AND_ABOVE │
+│ Malicious URIs                    │ ENABLED     │                  │
+└───────────────────────────────────┴─────────────┴──────────────────┘
+```
+
 ```console
 $ geadm armor --since 7d
                           Model Armor violations (7d)

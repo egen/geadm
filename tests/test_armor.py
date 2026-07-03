@@ -75,6 +75,30 @@ def test_normalize_maps_direction_and_content():
     assert row["template"] == "tmpl"
 
 
+def test_template_rows_renders_all_filter_groups():
+    fc = {
+        "piAndJailbreakFilterSettings": {"filterEnforcement": "ENABLED", "confidenceLevel": "HIGH"},
+        "raiSettings": {
+            "raiFilters": [
+                {"filterType": "DANGEROUS", "confidenceLevel": "MEDIUM_AND_ABOVE"},
+                {"filterType": "HATE_SPEECH", "confidenceLevel": "MEDIUM_AND_ABOVE"},
+            ]
+        },
+        "maliciousUriFilterSettings": {"filterEnforcement": "ENABLED"},
+    }
+    rows = armor.template_rows(fc)
+    labels = [r[0] for r in rows]
+    assert "Prompt injection & jailbreak" in labels
+    assert "Responsible AI: DANGEROUS" in labels
+    assert "Malicious URIs" in labels
+    pi = next(r for r in rows if r[0] == "Prompt injection & jailbreak")
+    assert pi[1] == "ENABLED" and pi[2] == "HIGH"
+
+
+def test_template_rows_empty_config():
+    assert armor.template_rows({}) == []
+
+
 def test_normalize_response_direction():
     entry = SimpleNamespace(
         payload={"operationType": "SANITIZE_MODEL_RESPONSE", "sanitizationResult": {}},
