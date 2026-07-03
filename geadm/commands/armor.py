@@ -110,6 +110,84 @@ def collect_violations(clients: Any, filter_str: str, limit: int) -> list[dict]:
     return [_normalize(e) for e in entries]
 
 
+# ---- policy (Model Armor template) ------------------------------------------
+
+
+def _discover_templates(clients: Any, since: str) -> list[tuple[str, str]]:
+    """Distinct (location, template_id) pairs actually screening traffic,
+    read from the sanitize log's resource labels."""
+    from google.cloud import logging_v2
+
+    filter_str = "\n".join(
+        [
+            f'logName="projects/{clients.project}/logs/{_ARMOR_LOG_ID}"',
+            f'timestamp>="{since_rfc3339(since)}"',
+        ]
+    )
+    seen: list[tuple[str, str]] = []
+    for entry in clients.logging.list_entries(
+        filter_=filter_str, order_by=logging_v2.DESCENDING, max_results=200
+    ):
+        labels = dict(getattr(getattr(entry, "resource", None), "labels", None) or {})
+        pair = (labels.get("location"), labels.get("template_id"))
+        if all(pair) and pair not in seen:
+            seen.append(pair)  # type: ignore[arg-type]
+    return seen  # type: ignore[return-value]
+
+
+def template_rows(filter_config: dict) -> list[tuple[str, str, str]]:
+    """(filter, status, detail) rows for a Model Armor filterConfig."""
+    rows: list[tuple[str, str, str]] = []
+    pi = filter_config.get("piAndJailbreakFilterSettings") or {}
+    if pi:
+        rows.append(
+            (
+                "Prompt injection & jailbreak",
+                pi.get("filterEnforcement", "?"),
+                pi.get("confidenceLevel", ""),
+            )
+        )
+    for rai in (filter_config.get("raiSettings") or {}).get("raiFilters") or []:
+        rows.append(
+            (
+                f"Responsible AI: {rai.get('filterType', '?')}",
+                "ENABLED",
+                rai.get("confidenceLevel", ""),
+            )
+        )
+    mal = filter_config.get("maliciousUriFilterSettings") or {}
+    if mal:
+        rows.append(("Malicious URIs", mal.get("filterEnforcement", "?"), ""))
+    csam = filter_config.get("csamFilterSettings") or {}
+    if csam:
+        rows.append(("CSAM", csam.get("filterEnforcement", "?"), ""))
+    sdp = filter_config.get("sdpSettings") or {}
+    if sdp:
+        rows.append(("Sensitive data protection", "CONFIGURED", ""))
+    return rows
+
+
+def collect_policy(clients: Any, since: str) -> list[dict]:
+    """Fetch the filter config of every Model Armor template in use."""
+    templates: list[dict] = []
+    for location, template_id in _discover_templates(clients, since):
+        name = f"projects/{clients.project}/locations/{location}/templates/{template_id}"
+        data = clients.rest_get(
+            f"v1/{name}", host=f"modelarmor.{location}.rep.googleapis.com"
+        )
+        templates.append(
+            {
+                "name": data.get("name"),
+                "template_id": template_id,
+                "location": location,
+                "labels": data.get("labels") or {},
+                "filter_config": data.get("filterConfig") or {},
+                "update_time": data.get("updateTime"),
+            }
+        )
+    return templates
+
+
 def _render_table(rows: list[dict], since: str, matched_only: bool) -> Any:
     scope = "violations" if matched_only else "screenings"
     title = f"Model Armor {scope} ({since})"
@@ -138,8 +216,36 @@ def _render_table(rows: list[dict], since: str, matched_only: bool) -> Any:
     )
 
 
+def _render_policy(templates: list[dict]) -> Any:
+    from rich.console import Group
+    from rich.text import Text
+
+    if not templates:
+        return Text(
+            "No Model Armor templates found screening this project in the window.",
+            style="yellow",
+        )
+    pieces: list[Any] = []
+    for tmpl in templates:
+        rows = [
+            (name, status, detail)
+            for name, status, detail in template_rows(tmpl["filter_config"])
+        ]
+        pieces.append(
+            render.table(
+                f"Model Armor policy — {tmpl['template_id']} ({tmpl['location']})",
+                ["Filter", "Enforcement", "Confidence"],
+                rows or [("[dim]no filters configured[/dim]", "", "")],
+            )
+        )
+    return Group(*pieces)
+
+
 def armor_command(
     ctx: typer.Context,
+    policy: bool = typer.Option(
+        False, "--policy", help="Print the configured Model Armor template(s) instead."
+    ),
     since: str = typer.Option("24h", "--since", help="Look-back window, e.g. 1h, 24h, 7d."),
     all_: bool = typer.Option(
         False, "--all", help="Include screenings that passed (not just violations)."
@@ -147,16 +253,26 @@ def armor_command(
     limit: int = typer.Option(50, "--limit", help="Maximum entries to return."),
     as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Show Model Armor violations (screened prompts/responses that tripped a filter)."""
-    # Surfaces the screened prompt/response text, so warn first.
-    render.warn_banner(
-        "Output includes prompt/response content that Model Armor screened."
-    )
-
+    """Show Model Armor violations, or the configured policy with --policy."""
     from geadm.auth import get_clients
 
     state = ctx.obj
     clients = get_clients(state.project, state.location, getattr(state, "quota_project", None))
+
+    if policy:
+        # Policy is configuration, not screened content — no banner.
+        try:
+            templates = collect_policy(clients, since)
+        except ValueError as exc:
+            render.err_console.print(f"[bold red]Error:[/bold red] {exc}")
+            raise typer.Exit(code=1) from None
+        render.output(templates, _render_policy(templates), as_json)
+        return
+
+    # Surfaces the screened prompt/response text, so warn first.
+    render.warn_banner(
+        "Output includes prompt/response content that Model Armor screened."
+    )
     matched_only = not all_
 
     try:
