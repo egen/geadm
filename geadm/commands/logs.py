@@ -148,14 +148,23 @@ def _payload_to_dict(payload: Any) -> dict:
 
 
 def _extract_prompt_text(payload_dict: dict) -> Optional[str]:
-    """Prompt text from a gemini_enterprise_user_activity entry
-    (jsonPayload.request.query.parts[].text), when present."""
+    """Prompt text from a gemini_enterprise_user_activity entry.
+
+    Observed shapes: jsonPayload.request.query.text,
+    jsonPayload.request.query.parts[].text, and (on ModelArmorAudit
+    entries) jsonPayload.request.userPromptData.text.
+    """
     request = payload_dict.get("request")
     if not isinstance(request, Mapping):
         return None
+    prompt_data = request.get("userPromptData")
+    if isinstance(prompt_data, Mapping) and prompt_data.get("text"):
+        return str(prompt_data["text"])
     query = request.get("query")
     if not isinstance(query, Mapping):
         return None
+    if query.get("text"):
+        return str(query["text"])
     parts = query.get("parts")
     if not isinstance(parts, list):
         return None
