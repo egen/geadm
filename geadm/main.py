@@ -71,10 +71,20 @@ app.command(name="doctor")(doctor_cmd.doctor_command)
 
 def run() -> None:
     """Console entrypoint: run the app with concise permission-error reporting."""
+    import warnings
+
     from google.api_core.exceptions import PermissionDenied
     from requests import HTTPError
 
     from geadm.render import err_console
+
+    # google.auth warns that user ADC has no quota project; geadm sets one
+    # itself (see auth.Clients._credentials), so the warning is just noise.
+    warnings.filterwarnings(
+        "ignore",
+        message=".*end user credentials.*without a quota project.*",
+        category=UserWarning,
+    )
 
     try:
         app()
