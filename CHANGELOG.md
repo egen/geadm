@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/egen/geadm/compare/v0.2.2...v0.3.0) (2026-07-03)
+
+
+### Features
+
+* **cli:** add update command ([#24](https://github.com/egen/geadm/issues/24)) ([9cc11e7](https://github.com/egen/geadm/commit/9cc11e73ef839eccc0c20d6cb60555d9a6ae117f))
+
 ## [0.2.2](https://github.com/egen/geadm/compare/v0.2.1...v0.2.2) (2026-07-03)
 
 
