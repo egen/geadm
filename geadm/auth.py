@@ -108,8 +108,15 @@ class Clients:
         return self._cached("monitoring", build)
 
     # ---- REST fallback (GET only) -------------------------------------------
-    def rest_get(self, path: str, params: dict[str, str] | None = None) -> dict:
-        """HTTP GET against the Discovery Engine REST API (regional-aware).
+    def rest_get(
+        self,
+        path: str,
+        params: dict[str, str] | None = None,
+        host: str | None = None,
+    ) -> dict:
+        """HTTP GET against a Google Cloud REST API (Discovery Engine by
+        default, regional-aware; pass `host` for other read surfaces such as
+        logging.googleapis.com logs.list).
 
         For read surfaces the published Python clients don't expose
         (e.g. v1alpha dataConnector / assistants agents). GET only — this
@@ -124,7 +131,8 @@ class Clients:
             return AuthorizedSession(self._credentials)
 
         session = self._cached("session", build)
-        host = _regional_endpoint(self.location) or "discoveryengine.googleapis.com"
+        if host is None:
+            host = _regional_endpoint(self.location) or "discoveryengine.googleapis.com"
         resp = session.get(
             f"https://{host}/{path.lstrip('/')}", params=params or {}, timeout=60
         )

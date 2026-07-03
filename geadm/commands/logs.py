@@ -215,6 +215,56 @@ def _normalize_entry(entry: Any) -> dict:
     }
 
 
+def _log_exists(clients: Any, log_id: str) -> Optional[bool]:
+    """Whether the project has ever retained entries for this log ID.
+
+    Uses the read-only Logging logs.list method (roles/logging.viewer).
+    Returns None when the check itself fails, so callers stay silent
+    rather than guessing.
+    """
+    from urllib.parse import unquote
+
+    try:
+        names: list[str] = []
+        page_token: Optional[str] = None
+        while True:
+            params = {"pageSize": "200"}
+            if page_token:
+                params["pageToken"] = page_token
+            data = clients.rest_get(
+                f"v2/projects/{clients.project}/logs",
+                params=params,
+                host="logging.googleapis.com",
+            )
+            names.extend(data.get("logNames") or [])
+            page_token = data.get("nextPageToken")
+            if not page_token:
+                break
+    except Exception:
+        return None
+    target = unquote(log_id)
+    return any(unquote(n.rsplit("/logs/", 1)[-1]) == target for n in names)
+
+
+def _print_empty_hint(clients: Any, log_id: str, label: str, enable_hint: str) -> None:
+    """Explain an empty result: distinguish 'log never written' (logging not
+    enabled) from 'log exists but nothing matched the filter/window'."""
+    from urllib.parse import unquote
+
+    exists = _log_exists(clients, log_id)
+    if exists is False:
+        render.err_console.print(
+            f"[yellow]Note:[/yellow] the {label} log "
+            f"([bold]{unquote(log_id)}[/bold]) has never been written in "
+            f"project {clients.project} (or has no retained entries). "
+            f"{enable_hint}"
+        )
+    elif exists:
+        render.err_console.print(
+            f"[dim]The {label} log exists; no entries matched the filter/time window.[/dim]"
+        )
+
+
 def collect_entries(clients: Any, filter_str: str, limit: int) -> list[dict]:
     """List (read-only) and normalize Cloud Logging entries for a filter."""
     from google.cloud import logging_v2
@@ -297,6 +347,14 @@ def connector(
     title = f"Connector activity ({since})"
     table_ = _render_table(title, rows, show_entity=True)
     render.output(rows, table_, as_json)
+    if not rows:
+        _print_empty_hint(
+            clients,
+            _CONNECTOR_LOG_ID,
+            "connector activity",
+            "Connector-activity logging is likely not enabled for this project; "
+            "enabling it requires roles/discoveryengine.agentspaceAdmin.",
+        )
 
 
 @app.command()
@@ -343,3 +401,12 @@ def user(
     title = f"User activity: {email} ({since})"
     table_ = _render_table(title, rows, show_entity=False)
     render.output(rows, table_, as_json)
+    if not rows:
+        _print_empty_hint(
+            clients,
+            _USER_ACTIVITY_LOG_ID,
+            "Gemini Enterprise user activity",
+            "Observability / prompt-response logging is likely not enabled for "
+            "this project (requires roles/discoveryengine.agentspaceAdmin), or "
+            "this principal has no activity.",
+        )
