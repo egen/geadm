@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.scripts]
-geadm = "geadm.main:app"
+geadm = "geadm.main:run"
 
 [build-system]
 requires = ["hatchling"]

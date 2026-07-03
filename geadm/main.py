@@ -69,5 +69,42 @@ app.command(name="stats")(stats_cmd.stats_command)
 app.command(name="doctor")(doctor_cmd.doctor_command)
 
 
+def run() -> None:
+    """Console entrypoint: run the app with concise permission-error reporting."""
+    from google.api_core.exceptions import PermissionDenied
+    from requests import HTTPError
+
+    from geadm.render import err_console
+
+    try:
+        app()
+    except PermissionDenied as exc:
+        message = (getattr(exc, "message", None) or str(exc)).splitlines()[0]
+        err_console.print(f"[bold red]Permission denied:[/bold red] {message}")
+        if "serviceusage" in message or "USER_PROJECT_DENIED" in str(exc.errors):
+            err_console.print(
+                "[yellow]Hint:[/yellow] your ADC user credentials must bill API "
+                "quota to a project where you hold serviceusage.services.use. "
+                "Pass [bold]--quota-project <project>[/bold] (or set "
+                "GOOGLE_CLOUD_QUOTA_PROJECT) to bill a project you can use."
+            )
+        else:
+            err_console.print(
+                "[yellow]Hint:[/yellow] geadm needs roles/discoveryengine.viewer, "
+                "roles/logging.viewer and roles/monitoring.viewer on the target "
+                "project."
+            )
+        raise SystemExit(1) from None
+    except HTTPError as exc:
+        response = exc.response
+        err_console.print(f"[bold red]API error:[/bold red] {exc}")
+        if response is not None and response.status_code == 403:
+            err_console.print(
+                "[yellow]Hint:[/yellow] check roles/discoveryengine.viewer on the "
+                "target project, or --quota-project if the error mentions quota."
+            )
+        raise SystemExit(1) from None
+
+
 if __name__ == "__main__":
-    app()
+    run()
