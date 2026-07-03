@@ -36,6 +36,7 @@ class Clients:
 
     project: str
     location: str = "global"
+    quota_project: str | None = None
     _cache: dict[str, Any] = field(default_factory=dict, repr=False)
 
     @property
@@ -51,7 +52,9 @@ class Clients:
                 scopes=["https://www.googleapis.com/auth/cloud-platform"]
             )
             if hasattr(credentials, "with_quota_project"):
-                credentials = credentials.with_quota_project(self.project)
+                credentials = credentials.with_quota_project(
+                    self.quota_project or self.project
+                )
             self._cache["credentials"] = credentials
         return self._cache["credentials"]
 
@@ -135,10 +138,16 @@ def _adc_project() -> str | None:
     return project
 
 
-def get_clients(project: str | None, location: str = "global") -> Clients:
+def get_clients(
+    project: str | None,
+    location: str = "global",
+    quota_project: str | None = None,
+) -> Clients:
     """Return the shared read-only client factory.
 
-    If project is None, falls back to the ADC default project.
+    If project is None, falls back to the ADC default project. quota_project
+    lets user-credential callers bill API quota to a project they hold
+    serviceusage.services.use on when they lack it on the target project.
     """
     resolved = project or _adc_project()
     if not resolved:
@@ -146,4 +155,6 @@ def get_clients(project: str | None, location: str = "global") -> Clients:
             "No project specified and ADC has no default project. "
             "Pass --project or run `gcloud auth application-default login`."
         )
-    return Clients(project=resolved, location=location or "global")
+    return Clients(
+        project=resolved, location=location or "global", quota_project=quota_project
+    )

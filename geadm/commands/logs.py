@@ -252,7 +252,7 @@ def connector(
     from geadm.auth import get_clients
 
     state = ctx.obj
-    clients = get_clients(state.project, state.location)
+    clients = get_clients(state.project, state.location, getattr(state, "quota_project", None))
 
     try:
         filter_str = connector_filter(clients.project, datastore, severity, since)
@@ -298,7 +298,7 @@ def user(
     from geadm.auth import get_clients
 
     state = ctx.obj
-    clients = get_clients(state.project, state.location)
+    clients = get_clients(state.project, state.location, getattr(state, "quota_project", None))
 
     try:
         filter_str = user_filter(clients.project, email, since)

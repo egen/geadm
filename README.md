@@ -36,7 +36,10 @@ not something `geadm` does or needs.
 When authenticating as a user (not a service account), the Discovery Engine API
 requires a quota project. `geadm` sets the target project as the quota project
 automatically, which additionally requires `roles/serviceusage.serviceUsageConsumer`
-(or any role containing `serviceusage.services.use`) on that project.
+(or any role containing `serviceusage.services.use`) on that project. If you lack
+that permission on the target project, pass `--quota-project <other-project>`
+(or set `GOOGLE_CLOUD_QUOTA_PROJECT`) to bill quota against a project you do
+hold it on.
 
 ## Commands
 

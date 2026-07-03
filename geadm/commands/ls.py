@@ -267,7 +267,7 @@ def engines(
     roles/discoveryengine.viewer.
     """
     state = ctx.obj
-    clients = get_clients(state.project, state.location)
+    clients = get_clients(state.project, state.location, getattr(state, "quota_project", None))
     data = collect_engines(clients)
     rows = [
         (
@@ -299,7 +299,7 @@ def datastores(
     roles/discoveryengine.viewer.
     """
     state = ctx.obj
-    clients = get_clients(state.project, state.location)
+    clients = get_clients(state.project, state.location, getattr(state, "quota_project", None))
     data = collect_datastores(clients)
     rows = [
         (
@@ -332,7 +332,7 @@ def connectors(
     surface). Requires only roles/discoveryengine.viewer.
     """
     state = ctx.obj
-    clients = get_clients(state.project, state.location)
+    clients = get_clients(state.project, state.location, getattr(state, "quota_project", None))
     try:
         connectors_data = collect_connectors(clients)
     except requests.HTTPError as exc:
@@ -386,7 +386,7 @@ def agents(
     roles/discoveryengine.viewer.
     """
     state = ctx.obj
-    clients = get_clients(state.project, state.location)
+    clients = get_clients(state.project, state.location, getattr(state, "quota_project", None))
     data = collect_agents(clients)
     rows = [
         (

@@ -283,7 +283,7 @@ def stats_command(
     from geadm.auth import get_clients
 
     state = ctx.obj
-    clients = get_clients(state.project, state.location)
+    clients = get_clients(state.project, state.location, getattr(state, "quota_project", None))
 
     try:
         data = collect_stats(clients, since=since, engine=engine)

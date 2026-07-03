@@ -139,7 +139,7 @@ def doctor_command(
     Exits 1 if any check FAILs.
     """
     state = ctx.obj
-    clients = get_clients(state.project, state.location)
+    clients = get_clients(state.project, state.location, getattr(state, "quota_project", None))
     results = run_doctor(clients, since)
 
     def styled(row: dict) -> list[Any]:

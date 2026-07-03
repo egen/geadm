@@ -23,6 +23,7 @@ app = typer.Typer(
 class AppState:
     project: str | None
     location: str
+    quota_project: str | None = None
 
 
 @app.callback()
@@ -41,9 +42,18 @@ def main(
         "-l",
         help="Gemini Enterprise location (e.g. global, us, eu).",
     ),
+    quota_project: str = typer.Option(
+        None,
+        "--quota-project",
+        help=(
+            "Project to bill API quota against (defaults to --project). Useful "
+            "when you lack serviceusage.services.use on the target project."
+        ),
+        envvar="GOOGLE_CLOUD_QUOTA_PROJECT",
+    ),
 ) -> None:
     """Read-only troubleshooting CLI for Google Gemini Enterprise."""
-    ctx.obj = AppState(project=project, location=location)
+    ctx.obj = AppState(project=project, location=location, quota_project=quota_project)
 
 
 # ---- command groups (implemented in geadm/commands/) -----------------------
