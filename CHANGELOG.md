@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/egen/geadm/compare/v0.3.0...v0.3.1) (2026-07-03)
+
+
+### Bug Fixes
+
+* **cli:** tighten command help text ([#25](https://github.com/egen/geadm/issues/25)) ([371265a](https://github.com/egen/geadm/commit/371265a64e1d81da156f63e8d059292678030e8a))
+
 ## [0.3.0](https://github.com/egen/geadm/compare/v0.2.2...v0.3.0) (2026-07-03)
 
 
