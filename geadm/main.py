@@ -102,7 +102,7 @@ def _build_commit() -> str:
 def version(
     as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Show version information."""
+    """Show version and build commit."""
     from importlib.metadata import PackageNotFoundError
     from importlib.metadata import version as pkg_version
 

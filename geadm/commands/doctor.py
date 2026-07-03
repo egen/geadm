@@ -173,10 +173,7 @@ def doctor_command(
     ),
     as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run a health check.
-
-    Exits non-zero if any check fails.
-    """
+    """Run a health check (exits non-zero on failure)."""
     state = ctx.obj
     clients = get_clients(state.project, state.location, getattr(state, "quota_project", None))
 

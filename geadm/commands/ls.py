@@ -222,7 +222,7 @@ def _agent_error_note(status: int | None) -> str:
 
 
 def collect_agents(clients: Clients) -> list[dict]:
-    """List agents for each engine."""
+    """List agents."""
     results: list[dict] = []
     for engine in collect_engines(clients):
         engine_id = engine["id"]
@@ -395,7 +395,7 @@ def agents(
     ctx: typer.Context,
     as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """List agents for each engine."""
+    """List agents."""
     state = ctx.obj
     clients = get_clients(state.project, state.location, getattr(state, "quota_project", None))
     data = collect_agents(clients)

@@ -611,7 +611,7 @@ def connector(
         "stop). With --json, emits newline-delimited JSON.",
     ),
 ) -> None:
-    """Show data-connector activity logs."""
+    """Show connector activity."""
     from geadm.auth import get_clients
 
     state = ctx.obj
@@ -667,11 +667,7 @@ def user(
         "stop). With --json, emits newline-delimited JSON.",
     ),
 ) -> None:
-    """Show user activity for one user, or all users.
-
-    Output may include prompt/response content when prompt/response
-    logging is enabled on the project.
-    """
+    """Show end-user activity (may include prompt/response content)."""
     # warn_banner MUST be the first thing printed: this command can surface
     # end-user prompt/response content, and callers need to see the warning
     # before anything else regardless of --json (it goes to stderr).
@@ -734,11 +730,7 @@ def ai(
         "stop). With --json, emits newline-delimited JSON.",
     ),
 ) -> None:
-    """Stream raw prompt/response content logs.
-
-    Entries carry no user identity; use `geadm logs user` for
-    per-user activity.
-    """
+    """Stream prompt/response content (no per-user identity)."""
     # warn_banner MUST be the first thing printed: every entry here is raw
     # prompt/response content, and callers need to see the warning before
     # anything else regardless of --json (it goes to stderr).
