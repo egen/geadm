@@ -68,6 +68,16 @@ def connector_filter(
     The %2F-encoded slash in the logName is required by the Logging API;
     a literal "/" in connector_activity does not match.
     """
+    clauses = connector_base_clauses(project, datastore, severity)
+    clauses.append(f'timestamp>="{since_rfc3339(since)}"')
+    return "\n".join(clauses)
+
+
+def connector_base_clauses(
+    project: str, datastore: Optional[str], severity: Optional[str]
+) -> list[str]:
+    """connector_filter without the timestamp clause (follow mode appends
+    its own cursor)."""
     clauses = [f'logName="projects/{project}/logs/{_CONNECTOR_LOG_ID}"']
 
     if datastore:
@@ -85,27 +95,35 @@ def connector_filter(
             )
         clauses.append(f"severity>={sev}")
 
-    clauses.append(f'timestamp>="{since_rfc3339(since)}"')
-    return "\n".join(clauses)
+    return clauses
 
 
 _USER_ACTIVITY_LOG_ID = "discoveryengine.googleapis.com%2Fgemini_enterprise_user_activity"
 
 
-def user_filter(project: str, email: str, since: str) -> str:
-    """Build the Cloud Logging filter for `logs user <email>`.
+def user_filter(project: str, email: Optional[str], since: str) -> str:
+    """Build the Cloud Logging filter for `logs user [email]`.
 
     Gemini Enterprise writes per-user query/assist activity to the
     gemini_enterprise_user_activity log; the caller identity lives in
     jsonPayload.userIamPrincipal (verified against live GE entries — these
     are platform logs, not audit logs, so there is no protoPayload).
+
+    email None (or "*" / "all") means all users: the principal clause is
+    omitted entirely.
     """
-    clauses = [
-        f'logName="projects/{project}/logs/{_USER_ACTIVITY_LOG_ID}"',
-        f'jsonPayload.userIamPrincipal="{email}"',
-        f'timestamp>="{since_rfc3339(since)}"',
-    ]
+    clauses = user_base_clauses(project, email)
+    clauses.append(f'timestamp>="{since_rfc3339(since)}"')
     return "\n".join(clauses)
+
+
+def user_base_clauses(project: str, email: Optional[str]) -> list[str]:
+    """user_filter without the timestamp clause (follow mode appends its
+    own cursor)."""
+    clauses = [f'logName="projects/{project}/logs/{_USER_ACTIVITY_LOG_ID}"']
+    if email and email not in ("*", "all"):
+        clauses.append(f'jsonPayload.userIamPrincipal="{email}"')
+    return clauses
 
 
 # ---- entry normalization -----------------------------------------------------
@@ -210,8 +228,10 @@ def _normalize_entry(entry: Any) -> dict:
         "message": _extract_message(payload, payload_dict),
         "status": _extract_status(payload_dict),
         "entity_name": _extract_entity_name(payload_dict),
+        "user": payload_dict.get("userIamPrincipal"),
         "resource_type": resource_type,
         "resource_labels": dict(resource_labels),
+        "insert_id": getattr(entry, "insert_id", None),
     }
 
 
@@ -280,8 +300,12 @@ def collect_entries(clients: Any, filter_str: str, limit: int) -> list[dict]:
 # ---- rendering ---------------------------------------------------------------
 
 
-def _render_table(title: str, rows: list[dict], show_entity: bool) -> Any:
+def _render_table(
+    title: str, rows: list[dict], show_entity: bool, show_user: bool = False
+) -> Any:
     columns = ["Time", "Severity", "Message"]
+    if show_user:
+        columns.insert(2, "User")
     if show_entity:
         columns.insert(2, "Connector / Entity")
 
@@ -292,10 +316,75 @@ def _render_table(title: str, rows: list[dict], show_entity: bool) -> Any:
         cells = [row.get("timestamp"), styled_sev]
         if show_entity:
             cells.append(row.get("entity_name"))
+        if show_user:
+            cells.append(row.get("user"))
         cells.append(row.get("message"))
         table_rows.append(cells)
 
     return render.table(title, columns, table_rows)
+
+
+def _print_follow_row(row: dict, show_user: bool, as_json: bool) -> None:
+    """One streamed entry in follow mode: NDJSON with --json, else a line."""
+    if as_json:
+        import json
+
+        print(json.dumps(row, default=str), flush=True)
+        return
+    sev = row.get("severity") or "DEFAULT"
+    parts = [
+        f"[dim]{row.get('timestamp')}[/dim]",
+        f"[{render.severity_style(sev)}]{sev:<8}[/{render.severity_style(sev)}]",
+    ]
+    if show_user and row.get("user"):
+        parts.append(f"[cyan]{row['user']}[/cyan]")
+    if row.get("entity_name"):
+        parts.append(f"[magenta]{row['entity_name']}[/magenta]")
+    parts.append(row.get("message") or "")
+    render.console.print(" ".join(parts), highlight=False)
+
+
+def _follow(
+    clients: Any,
+    base_filter: str,
+    show_user: bool,
+    as_json: bool,
+    interval: float = 5.0,
+) -> None:
+    """Poll entries.list forever, printing new entries as they arrive.
+
+    `base_filter` must NOT contain a timestamp clause; the cursor is
+    appended per poll. Read-only, Ctrl+C to stop.
+    """
+    import time as _time
+    from datetime import datetime, timezone
+
+    from google.cloud import logging_v2
+
+    if not as_json:
+        render.err_console.print(
+            f"[dim]Following (poll every {interval:.0f}s) — Ctrl+C to stop.[/dim]"
+        )
+    cursor = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    seen: set[str] = set()
+    while True:
+        filter_str = f'{base_filter}\ntimestamp>="{cursor}"'
+        entries = clients.logging.list_entries(
+            filter_=filter_str, order_by=logging_v2.ASCENDING, page_size=100
+        )
+        for entry in entries:
+            row = _normalize_entry(entry)
+            key = row.get("insert_id") or f"{row.get('timestamp')}|{row.get('message')}"
+            if key in seen:
+                continue
+            seen.add(key)
+            _print_follow_row(row, show_user, as_json)
+            if row.get("timestamp"):
+                cursor = row["timestamp"]
+        # keep the dedupe set bounded; cursor overlap only needs recent ids
+        if len(seen) > 1000:
+            seen = set(list(seen)[-200:])
+        _time.sleep(interval)
 
 
 # ---- commands ------------------------------------------------------------
@@ -323,6 +412,13 @@ def connector(
     ),
     limit: int = typer.Option(50, "--limit", help="Maximum entries to return."),
     as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+    follow: bool = typer.Option(
+        False,
+        "--follow",
+        "-f",
+        help="Stream new entries as they arrive (polls every 5s; Ctrl+C to "
+        "stop). With --json, emits newline-delimited JSON.",
+    ),
 ) -> None:
     """Show Discovery Engine data-connector activity logs.
 
@@ -338,9 +434,14 @@ def connector(
 
     try:
         filter_str = connector_filter(clients.project, datastore, severity, since)
+        base_clauses = connector_base_clauses(clients.project, datastore, severity)
     except ValueError as exc:
         render.err_console.print(f"[bold red]Error:[/bold red] {exc}")
         raise typer.Exit(code=1) from None
+
+    if follow:
+        _follow(clients, "\n".join(base_clauses), show_user=False, as_json=as_json)
+        return
 
     rows = collect_entries(clients, filter_str, limit)
 
@@ -360,7 +461,12 @@ def connector(
 @app.command()
 def user(
     ctx: typer.Context,
-    email: str = typer.Argument(..., help="Principal email to scope logs to."),
+    email: Optional[str] = typer.Argument(
+        None,
+        help="Principal email to scope logs to. Omit (or pass 'all') for "
+        "every user's activity. A bare * is expanded by your shell — "
+        "quote it or just leave the argument off.",
+    ),
     since: str = typer.Option(
         "24h",
         "--since",
@@ -368,8 +474,15 @@ def user(
     ),
     limit: int = typer.Option(50, "--limit", help="Maximum entries to return."),
     as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+    follow: bool = typer.Option(
+        False,
+        "--follow",
+        "-f",
+        help="Stream new entries as they arrive (polls every 5s; Ctrl+C to "
+        "stop). With --json, emits newline-delimited JSON.",
+    ),
 ) -> None:
-    """Show a single end user's Gemini Enterprise API activity.
+    """Show end users' Gemini Enterprise activity (one user, or all).
 
     WARNING: results can include end-user prompt/response content when
     prompt/response logging is enabled on the project. Reading these logs
@@ -389,17 +502,24 @@ def user(
 
     state = ctx.obj
     clients = get_clients(state.project, state.location, getattr(state, "quota_project", None))
+    all_users = not email or email in ("*", "all")
 
     try:
         filter_str = user_filter(clients.project, email, since)
+        base_clauses = user_base_clauses(clients.project, email)
     except ValueError as exc:
         render.err_console.print(f"[bold red]Error:[/bold red] {exc}")
         raise typer.Exit(code=1) from None
 
+    if follow:
+        _follow(clients, "\n".join(base_clauses), show_user=all_users, as_json=as_json)
+        return
+
     rows = collect_entries(clients, filter_str, limit)
 
-    title = f"User activity: {email} ({since})"
-    table_ = _render_table(title, rows, show_entity=False)
+    who = "all users" if all_users else email
+    title = f"User activity: {who} ({since})"
+    table_ = _render_table(title, rows, show_entity=False, show_user=all_users)
     render.output(rows, table_, as_json)
     if not rows:
         _print_empty_hint(

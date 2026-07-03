@@ -95,6 +95,8 @@ def run() -> None:
 
     try:
         app()
+    except KeyboardInterrupt:
+        raise SystemExit(130) from None
     except PermissionDenied as exc:
         message = (getattr(exc, "message", None) or str(exc)).splitlines()[0]
         err_console.print(f"[bold red]Permission denied:[/bold red] {message}")
