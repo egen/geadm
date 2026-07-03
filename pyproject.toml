@@ -15,6 +15,9 @@ dependencies = [
 [project.scripts]
 geadm = "geadm.main:run"
 
+[dependency-groups]
+dev = ["pytest>=8"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
