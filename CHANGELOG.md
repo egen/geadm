@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/egen/geadm/compare/v0.3.2...v0.4.0) (2026-07-03)
+
+
+### Features
+
+* **cli:** add armor command for Model Armor violations ([#30](https://github.com/egen/geadm/issues/30)) ([4245a8d](https://github.com/egen/geadm/commit/4245a8da03c46df414f522d70dc868b2af6e7451))
+
 ## [0.3.2](https://github.com/egen/geadm/compare/v0.3.1...v0.3.2) (2026-07-03)
 
 
