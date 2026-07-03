@@ -230,6 +230,7 @@ def _normalize_entry(entry: Any) -> dict:
         "status": _extract_status(payload_dict),
         "entity_name": _extract_entity_name(payload_dict),
         "user": payload_dict.get("userIamPrincipal"),
+        "reply": payload_dict.get("serviceTextReply"),
         "resource_type": resource_type,
         "resource_labels": dict(resource_labels),
         "insert_id": getattr(entry, "insert_id", None),
@@ -301,14 +302,30 @@ def collect_entries(clients: Any, filter_str: str, limit: int) -> list[dict]:
 # ---- rendering ---------------------------------------------------------------
 
 
+def _snippet(text: Optional[str], max_chars: int) -> Optional[str]:
+    """Whitespace-collapsed, truncated one-liner for table/tail display."""
+    if not text:
+        return None
+    flat = " ".join(text.split())
+    if len(flat) <= max_chars:
+        return flat
+    return flat[: max_chars - 1].rstrip() + "…"
+
+
 def _render_table(
-    title: str, rows: list[dict], show_entity: bool, show_user: bool = False
+    title: str,
+    rows: list[dict],
+    show_entity: bool,
+    show_user: bool = False,
+    show_reply: bool = False,
 ) -> Any:
     columns = ["Time", "Severity", "Message"]
     if show_user:
         columns.insert(2, "User")
     if show_entity:
         columns.insert(2, "Connector / Entity")
+    if show_reply:
+        columns.append("Reply (truncated)")
 
     table_rows = []
     for row in rows:
@@ -320,6 +337,8 @@ def _render_table(
         if show_user:
             cells.append(row.get("user"))
         cells.append(row.get("message"))
+        if show_reply:
+            cells.append(_snippet(row.get("reply"), 200))
         table_rows.append(cells)
 
     return render.table(title, columns, table_rows)
@@ -370,6 +389,9 @@ def _print_follow_row(row: dict, show_user: bool, as_json: bool) -> None:
         parts.append(f"[magenta]{entity}[/magenta]")
     parts.append(row.get("message") or "")
     render.console.print(" ".join(parts), highlight=False)
+    reply = _snippet(row.get("reply"), 300)
+    if reply:
+        render.console.print(f"         [dim]↳ {reply}[/dim]", highlight=False)
 
 
 def _follow(
@@ -547,7 +569,9 @@ def user(
 
     who = "all users" if all_users else email
     title = f"User activity: {who} ({since})"
-    table_ = _render_table(title, rows, show_entity=False, show_user=all_users)
+    table_ = _render_table(
+        title, rows, show_entity=False, show_user=all_users, show_reply=True
+    )
     render.output(rows, table_, as_json)
     if not rows:
         _print_empty_hint(
