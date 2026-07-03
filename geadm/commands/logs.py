@@ -8,8 +8,9 @@ Two subcommands:
 
   logs connector   Discovery Engine data-connector activity
                     (logName=".../connector_activity").
-  logs user        Per-end-user API activity, scoped by principal email
-                    (resource.type="consumed_api").
+  logs user        Per-end-user Gemini Enterprise activity, scoped by
+                    jsonPayload.userIamPrincipal on the
+                    gemini_enterprise_user_activity log.
 
 Reading logs only requires roles/logging.viewer. Actually *emitting*
 connector/observability logs in the first place requires the caller (or
@@ -88,18 +89,20 @@ def connector_filter(
     return "\n".join(clauses)
 
 
+_USER_ACTIVITY_LOG_ID = "discoveryengine.googleapis.com%2Fgemini_enterprise_user_activity"
+
+
 def user_filter(project: str, email: str, since: str) -> str:
     """Build the Cloud Logging filter for `logs user <email>`.
 
-    Scopes to consumed_api entries for the Discovery Engine service and
-    narrows to a single principal via the audit-log identity field
-    protoPayload.authenticationInfo.principalEmail.
+    Gemini Enterprise writes per-user query/assist activity to the
+    gemini_enterprise_user_activity log; the caller identity lives in
+    jsonPayload.userIamPrincipal (verified against live GE entries — these
+    are platform logs, not audit logs, so there is no protoPayload).
     """
-    del project  # entries.list already scopes to clients.project via resource_names
     clauses = [
-        'resource.type="consumed_api"',
-        'resource.labels.service="discoveryengine.googleapis.com"',
-        f'protoPayload.authenticationInfo.principalEmail="{email}"',
+        f'logName="projects/{project}/logs/{_USER_ACTIVITY_LOG_ID}"',
+        f'jsonPayload.userIamPrincipal="{email}"',
         f'timestamp>="{since_rfc3339(since)}"',
     ]
     return "\n".join(clauses)
@@ -125,6 +128,32 @@ def _payload_to_dict(payload: Any) -> dict:
         return {}
 
 
+def _extract_prompt_text(payload_dict: dict) -> Optional[str]:
+    """Prompt text from a gemini_enterprise_user_activity entry
+    (jsonPayload.request.query.parts[].text), when present."""
+    request = payload_dict.get("request")
+    if not isinstance(request, Mapping):
+        return None
+    query = request.get("query")
+    if not isinstance(query, Mapping):
+        return None
+    parts = query.get("parts")
+    if not isinstance(parts, list):
+        return None
+    texts = [p.get("text") for p in parts if isinstance(p, Mapping) and p.get("text")]
+    return " ".join(texts) if texts else None
+
+
+def _log_metadata(payload_dict: dict) -> Mapping:
+    """jsonPayload metadata block; connector logs spell it LogMetadata,
+    user-activity logs spell it logMetadata."""
+    for key in ("LogMetadata", "logMetadata"):
+        value = payload_dict.get(key)
+        if isinstance(value, Mapping):
+            return value
+    return {}
+
+
 def _extract_message(payload: Any, payload_dict: dict) -> str:
     if isinstance(payload, str):
         return payload
@@ -133,7 +162,14 @@ def _extract_message(payload: Any, payload_dict: dict) -> str:
     status = payload_dict.get("status")
     if isinstance(status, Mapping) and status.get("message"):
         return str(status["message"])
-    method_name = payload_dict.get("methodName")
+    method_name = payload_dict.get("methodName") or _log_metadata(payload_dict).get(
+        "methodName"
+    )
+    prompt = _extract_prompt_text(payload_dict)
+    if method_name and prompt:
+        return f"{method_name}: {prompt}"
+    if prompt:
+        return prompt
     if method_name:
         return str(method_name)
     if payload_dict:
@@ -151,13 +187,9 @@ def _extract_status(payload_dict: dict) -> Any:
 
 
 def _extract_entity_name(payload_dict: dict) -> Optional[str]:
-    """Connector/entity resource name, when present (LogMetadata.name)."""
-    log_metadata = payload_dict.get("LogMetadata")
-    if isinstance(log_metadata, Mapping):
-        name = log_metadata.get("name")
-        if name:
-            return str(name)
-    return None
+    """Connector/entity resource name, when present ((L|l)ogMetadata.name)."""
+    name = _log_metadata(payload_dict).get("name")
+    return str(name) if name else None
 
 
 def _normalize_entry(entry: Any) -> dict:

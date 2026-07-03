@@ -94,9 +94,12 @@ def run_doctor(clients: Clients, since: str) -> list[dict]:
         return OK, f"no connector ERROR logs since {since}"
 
     def check_api_errors() -> tuple[str, str]:
+        # consumed_api's service label carries the gRPC service name
+        # (e.g. google.cloud.discoveryengine.v1main.AssistantService), so
+        # match by substring rather than the API hostname.
         filter_str = (
             'resource.type="consumed_api" '
-            'resource.labels.service="discoveryengine.googleapis.com" '
+            'resource.labels.service:"discoveryengine" '
             "severity>=ERROR "
             f'timestamp>="{duration.since_rfc3339(since)}"'
         )
