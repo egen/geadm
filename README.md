@@ -116,13 +116,11 @@ getop logs user [email] [--since 24h] [--follow]
 getop logs ai [--since 24h] [--follow]
 ```
 
-`connector` shows data-connector sync activity. `user` shows end-user activity —
-prompts, assistant replies, searches, and Model Armor screening events — for one
-user, or all users when the email is omitted. `ai` streams the raw
-`gen_ai.user.message` / `gen_ai.choice` content logs (no identity field, so it
-can't be scoped per user — use `logs user` for that). `--follow`/`-f` tails
-either stream live. When a log is empty, getop tells you whether logging simply
-isn't enabled on the project or nothing matched your filter.
+`connector` shows sync activity. `user` shows end-user activity — prompts,
+replies, searches, and Model Armor events — for one user or all. `ai` streams
+the raw `gen_ai` content logs (no identity field; use `user` to scope by
+principal). `--follow`/`-f` tails any stream; an empty result says whether
+logging is off or just unmatched.
 
 ```console
 $ getop logs user --since 24h
