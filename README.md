@@ -325,6 +325,19 @@ Honest disclosure: getop was built almost entirely by an AI coding agent
 small scaffold that lives in this repo — and that scaffold is here for you to
 use too.
 
+**Keeping up is the hard part.** The biggest challenge for a tool like this
+isn't writing it — it's that Gemini Enterprise moves *fast*. Google ships
+changes to the product continually ([release notes](https://cloud.google.com/gemini-enterprise/docs/release-notes)),
+so client methods, log fields, and metric names drift underneath you, and new
+capabilities land that getop doesn't surface yet. The
+[`ge-api-drift`](.claude/skills/ge-api-drift/) skill is built for exactly this:
+it reconciles every API surface getop uses against the installed client and the
+current docs, and reports what has changed, been deprecated, or newly appeared.
+It is deliberately **not run in CI** — it's token-expensive and its findings
+need a human read — but run occasionally by a maintainer it catches necro code
+(calls to surfaces that have moved or vanished) and missing features worth
+adding. Treat it as a periodic checkup, not a gate.
+
 **How it was built.** The work was split across specialised subagents in
 [`.claude/agents/`](.claude/agents/) rather than one big prompt: a
 `ge-api-researcher` that verifies Google Cloud API surfaces *before* any code is
@@ -332,8 +345,7 @@ written (so method names and log fields aren't hallucinated), per-domain
 builders (`discoveryengine-lister`, `logging-inspector`, `monitoring-stats`)
 that each own one command module, and a `readonly-auditor` that proves the tool
 never calls a mutating API. Two skills in [`.claude/skills/`](.claude/skills/)
-support ongoing work: `ge-api-drift` reconciles getop's API usage against the
-installed client and current docs, and `bofh-review` is a pre-release
+support ongoing work: `ge-api-drift` (above) and `bofh-review`, a pre-release
 secret/leak/safety audit. Every command was live-tested against real Gemini
 Enterprise deployments, and the read-only guarantee is enforced by a
 source-scanning test ([`tests/test_readonly.py`](tests/test_readonly.py)) that
