@@ -31,6 +31,22 @@ def test_output_json_mode_is_pure_stdout(capsys):
     assert json.loads(captured.out) == [{"x": 1}]
 
 
+def test_emit_csv_header_and_rows(capsys):
+    render.emit_csv(
+        [{"user_principal": "a@b.com", "state": "ASSIGNED", "last_login_time": None}],
+        ["user_principal", "state", "last_login_time"],
+    )
+    out = capsys.readouterr().out.splitlines()
+    assert out[0] == "user_principal,state,last_login_time"
+    assert out[1] == "a@b.com,ASSIGNED,"  # None renders as empty field
+
+
+def test_emit_csv_empty_is_header_only(capsys):
+    render.emit_csv([], ["user_principal", "state"])
+    out = capsys.readouterr().out.strip().splitlines()
+    assert out == ["user_principal,state"]
+
+
 def test_warn_banner_goes_to_stderr(capsys):
     render.warn_banner("careful now")
     captured = capsys.readouterr()

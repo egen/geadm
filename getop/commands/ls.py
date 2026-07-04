@@ -417,19 +417,35 @@ def agents(
     output(data, rendered, as_json)
 
 
+_LICENSE_CSV_COLUMNS = [
+    "user_principal",
+    "license_assignment_state",
+    "license_config_id",
+    "last_login_time",
+    "create_time",
+    "update_time",
+]
+
+
 @app.command()
 def licenses(
     ctx: typer.Context,
     as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+    as_csv: bool = typer.Option(
+        False, "--csv", help="Emit CSV (a license roster for spreadsheets/audits)."
+    ),
 ) -> None:
     """List user licenses."""
-    from getop.render import err_console
+    from getop.render import emit_csv, err_console
 
     state = ctx.obj
     clients = get_clients(state.project, state.location, getattr(state, "quota_project", None))
     try:
         data = collect_licenses(clients)
     except gexceptions.NotFound:
+        if as_csv:
+            emit_csv([], _LICENSE_CSV_COLUMNS)
+            return
         rendered = table("User Licenses", ["Status"], [("no user store found",)])
         output([], rendered, as_json)
         return
@@ -441,6 +457,9 @@ def licenses(
             f"[dim]{exc}[/dim]"
         )
         raise typer.Exit(code=1) from None
+    if as_csv:
+        emit_csv(data, _LICENSE_CSV_COLUMNS)
+        return
     rows = [
         (
             lic["user_principal"],
