@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/egen/geadm/compare/v0.5.1...v0.6.0) (2026-07-04)
+
+
+### Features
+
+* **cli:** armor --summary aggregates hits by filter ([#37](https://github.com/egen/geadm/issues/37)) ([d22367e](https://github.com/egen/geadm/commit/d22367e483c3cffac3dbb8ba26c618811b5c533f))
+
 ## [0.5.1](https://github.com/egen/geadm/compare/v0.5.0...v0.5.1) (2026-07-03)
 
 
