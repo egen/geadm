@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/egen/getop/compare/v1.0.1...v1.0.2) (2026-07-04)
+
+
+### Documentation
+
+* **readme:** add Contributing section ([#48](https://github.com/egen/getop/issues/48)) ([80c919c](https://github.com/egen/getop/commit/80c919c01979524221e43db529dd99b0e2db556c))
+
 ## [1.0.1](https://github.com/egen/getop/compare/v1.0.0...v1.0.1) (2026-07-04)
 
 
