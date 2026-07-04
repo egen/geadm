@@ -76,6 +76,8 @@ getop ls engines|datastores|connectors|agents|licenses
 Lists resources across the collection hierarchy: engines and data stores under
 `default_collection`, data connectors across *all* collections (each
 connector-backed source lives in its own), agents per engine, and user licenses.
+`ls licenses` also takes `--csv` for a seat roster you can drop into a
+spreadsheet or a license audit.
 
 ```console
 $ getop ls connectors

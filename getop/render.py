@@ -79,6 +79,17 @@ def emit_json(data: Any) -> None:
     print(json.dumps(data, indent=2, default=_json_default))
 
 
+def emit_csv(rows: Sequence[dict], columns: Sequence[str]) -> None:
+    """Print rows as CSV to stdout: a header line then one line per row."""
+    import csv
+    import sys
+
+    writer = csv.writer(sys.stdout)
+    writer.writerow(columns)
+    for row in rows:
+        writer.writerow(["" if row.get(c) is None else row.get(c) for c in columns])
+
+
 def output(data: Any, renderable: Any, as_json: bool) -> None:
     """--json passthrough: emit `data` as JSON, otherwise print the Rich renderable."""
     if as_json:
