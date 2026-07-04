@@ -55,8 +55,8 @@ viewer roles alone, so it can be handed to anyone on the team without
 change-risk. It may grow administrative verbs (e.g. triggering connector syncs,
 managing agents) in a future release.
 
-Contributing with an AI coding agent? Read [AGENTS.md](AGENTS.md) — it maps the
-project subagents, skills and hard constraints.
+**Want to contribute?** getop was built with an AI-agent scaffold that ships in
+the repo and is yours to use too — see [Contributing](#contributing).
 
 ## Install
 
@@ -328,6 +328,41 @@ getop uses the target project automatically, which requires
 Enabling connector/observability *logging* on a project is a one-time setup
 step requiring `roles/discoveryengine.agentspaceAdmin`; getop only ever reads
 what's there.
+
+## Contributing
+
+Honest disclosure: getop was built almost entirely by an AI coding agent
+(Anthropic's Claude, via Claude Code), directed by a human maintainer, using a
+small scaffold that lives in this repo — and that scaffold is here for you to
+use too.
+
+**How it was built.** The work was split across specialised subagents in
+[`.claude/agents/`](.claude/agents/) rather than one big prompt: a
+`ge-api-researcher` that verifies Google Cloud API surfaces *before* any code is
+written (so method names and log fields aren't hallucinated), per-domain
+builders (`discoveryengine-lister`, `logging-inspector`, `monitoring-stats`)
+that each own one command module, and a `readonly-auditor` that proves the tool
+never calls a mutating API. Two skills in [`.claude/skills/`](.claude/skills/)
+support ongoing work: `ge-api-drift` reconciles getop's API usage against the
+installed client and current docs, and `bofh-review` is a pre-release
+secret/leak/safety audit. Every command was live-tested against real Gemini
+Enterprise deployments, and the read-only guarantee is enforced by a
+source-scanning test ([`tests/test_readonly.py`](tests/test_readonly.py)) that
+fails any mutating RPC, non-GET HTTP, or client built outside `getop/auth.py`.
+
+**How to contribute.** [`AGENTS.md`](AGENTS.md) is the entry point — it maps the
+subagents, skills, hard constraints, and workflow. By hand or with an agent:
+
+```sh
+uv sync && uv run pytest          # run the suite
+```
+
+- `main` is protected; changes go via a branch and PR with the tests passing.
+- Follow [Conventional Commits](https://www.conventionalcommits.org/) — the PR
+  title becomes the squash-merge subject and drives the release version.
+- Keep it read-only; `tests/test_readonly.py` is the guardrail.
+- Using an AI agent? Point it at `AGENTS.md` and let it drive the same subagents
+  and skills that built getop in the first place.
 
 ## License
 
