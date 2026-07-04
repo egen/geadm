@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.1](https://github.com/egen/getop/compare/v1.0.0...v1.0.1) (2026-07-04)
+
+
+### Documentation
+
+* **readme:** align hero, show getop catching a paused connector ([#44](https://github.com/egen/getop/issues/44)) ([8fd8caf](https://github.com/egen/getop/commit/8fd8cafa380542b60b553074c8678d71b3d23e31))
+* **readme:** intro lead-in + read-only wording ([#46](https://github.com/egen/getop/issues/46)) ([e1872c4](https://github.com/egen/getop/commit/e1872c457a5926fe1df8ab4a890313a4de42856d))
+* **readme:** sharper intro with capability bullets ([#43](https://github.com/egen/getop/issues/43)) ([7edb018](https://github.com/egen/getop/commit/7edb0180b8cc3be9fd3247a9774e174f226cd48d))
+* **readme:** tighten logs description ([#47](https://github.com/egen/getop/issues/47)) ([2f619c9](https://github.com/egen/getop/commit/2f619c9dcde983ea05634ec2592829b667cb080c))
+
 ## [1.0.0](https://github.com/egen/geadm/compare/v0.7.0...v1.0.0) (2026-07-04)
 
 
