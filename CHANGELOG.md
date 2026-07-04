@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/egen/geadm/compare/v0.6.0...v0.7.0) (2026-07-04)
+
+
+### Features
+
+* **quota:** link quota names to the Cloud console ([#39](https://github.com/egen/geadm/issues/39)) ([f837cc8](https://github.com/egen/geadm/commit/f837cc88258abf196b3063dc06b3524698db19ed))
+
 ## [0.6.0](https://github.com/egen/geadm/compare/v0.5.1...v0.6.0) (2026-07-04)
 
 
