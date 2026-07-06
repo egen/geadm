@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/egen/getop/compare/v1.1.0...v1.2.0) (2026-07-06)
+
+
+### Features
+
+* **config:** surface app-level configuration (observability, prompt logging, knowledge graph, agent gallery) ([#54](https://github.com/egen/getop/issues/54)) ([ac46f08](https://github.com/egen/getop/commit/ac46f0861e2fa74f25bd0f59bacfd1f3ce287ee9))
+
 ## [1.1.0](https://github.com/egen/getop/compare/v1.0.2...v1.1.0) (2026-07-04)
 
 
